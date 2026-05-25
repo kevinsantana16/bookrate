@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Livros — BookRate{% endblock %}
+
+{% block content %}
+<div class="admin-wrapper">
+
+  <header class="admin-header">
+    <div>
+      <h1><i class="fas fa-cloud-download-alt"></i> Importar do Google Books</h1>
+      <p>Busque e importe livros diretamente da API do Google Books</p>
+    </div>
+    <a href="{{ url_for('admin') }}" class="btn btn-outline-sm">
+      <i class="fas fa-arrow-left"></i> Voltar ao Admin
+    </a>
+  </header>
+
+  <!-- ── BUSCA ── -->
+  <section class="admin-card">
+    <h2 class="section-title">
+      <i class="fas fa-search"></i> Buscar Livros
+    </h2>
+    <div class="admin-form-row">
+      <div class="form-group" style="flex:3">
+        <input
+          id="import-query"
+          type="text"
+          placeholder='Ex: "ficção científica brasileira", "machado de assis"...'
+          autocomplete="off"
+        />
+      </div>
+      <div class="form-group form-group-btn">
+        <button class="btn btn-primary" onclick="buscarParaImportar()" id="btn-buscar-import">
+          <i class="fas fa-search"></i> Buscar
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── RESULTADOS ── -->
+  <section class="admin-card" id="import-results-section" style="display:none">
+    <div class="import-results-header">
+      <h2 class="section-title">
+        <i class="fas fa-list"></i> Resultados (<span id="import-count">0</span>)
+      </h2>
+      <div class="import-actions">
+        <button class="btn btn-outline-sm" onclick="toggleSelectAll()">
+          <i class="fas fa-check-double"></i> Selecionar Todos
+        </button>
+        <button class="btn btn-primary" onclick="importarSelecionados()" id="btn-importar">
+          <i class="fas fa-download"></i> Importar Selecionados (<span id="selected-count">0</span>)
+        </button>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="admin-table" id="import-table">
+        <thead>
+          <tr>
+            <th style="width:40px"><input type="checkbox" id="select-all-check" onchange="toggleSelectAll()" /></th>
+            <th style="width:54px">Capa</th>
+            <th>Título</th>
+            <th>Autor</th>
+            <th>Editora</th>
+            <th>Ano</th>
+            <th>Idioma</th>
+          </tr>
+        </thead>
+        <tbody id="import-tbody">
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state" id="import-empty" style="display:none">
+      <i class="fas fa-search"></i>
+      <p>Nenhum resultado encontrado.</p>
+    </div>
+  </section>
+
+  <!-- ── LOADING ── -->
+  <div class="import-loading" id="import-loading" style="display:none">
+    <div class="spinner"></div>
+    <p>Buscando livros na API do Google Books...</p>
+  </div>
+
+</div><!-- /admin-wrapper -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let importData = []; // Armazena os livros retornados pela busca
+
+  async function buscarParaImportar() {
+    const query = document.getElementById("import-query").value.trim();
+    if (!query) return;
+
+    const loading = document.getElementById("import-loading");
+    const section = document.getElementById("import-results-section");
+    const btn = document.getElementById("btn-buscar-import");
+
+    loading.style.display = "flex";
+    section.style.display = "none";
+    btn.disabled = true;
+
+    try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+      const resp = await fetch(`/admin/importar/buscar?q=${encodeURIComponent(query)}`, {
+        headers: { "X-CSRFToken": csrfToken },
+      });
+      if (!resp.ok) throw new Error("Erro na API");
+      const data = await resp.json();
+
+      if (data.error) {
+        alert("Erro: " + data.error);
+        return;
+      }
+
+      importData = data.livros || [];
+      renderImportResults();
+      section.style.display = "block";
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao buscar livros. Verifique a chave da API.");
+    } finally {
+      loading.style.display = "none";
+      btn.disabled = false;
+    }
+  }
+
+  function renderImportResults() {
+    const tbody = document.getElementById("import-tbody");
+    const empty = document.getElementById("import-empty");
+    const countEl = document.getElementById("import-count");
+    countEl.textContent = importData.length;
+
+    if (importData.length === 0) {
+      tbody.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+
+    tbody.innerHTML = importData.map((livro, i) => {
+      const capa = livro.capa_url
+        ? `<img src="${escapeHtml(livro.capa_url)}" style="width:38px;height:54px;object-fit:cover;border-radius:4px">`
+        : `<div style="width:38px;height:54px;background:rgba(124,106,247,0.15);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--accent)"><i class="fas fa-book"></i></div>`;
+      const ano = livro.data_publicacao ? String(livro.data_publicacao).slice(0,4) : "—";
+      const idioma = livro.idioma ? livro.idioma.toUpperCase() : "—";
+
+      return `<tr>
+        <td><input type="checkbox" class="import-check" data-index="${i}" onchange="updateSelectedCount()" /></td>
+        <td style="padding:6px 10px">${capa}</td>
+        <td>${escapeHtml(livro.titulo)}</td>
+        <td style="font-size:0.85rem;color:var(--text-secondary)">${escapeHtml(livro.autor)}</td>
+        <td style="font-size:0.78rem;color:var(--text-muted)">${escapeHtml(livro.editora || "—")}</td>
+        <td style="font-size:0.78rem;color:var(--text-muted)">${ano}</td>
+        <td style="font-size:0.78rem">${idioma}</td>
+      </tr>`;
+    }).join("");
+
+    updateSelectedCount();
+  }
+
+  function toggleSelectAll() {
+    const checks = document.querySelectorAll(".import-check");
+    const allChecked = [...checks].every(c => c.checked);
+    checks.forEach(c => c.checked = !allChecked);
+    document.getElementById("select-all-check").checked = !allChecked;
+    updateSelectedCount();
+  }
+
+  function updateSelectedCount() {
+    const count = document.querySelectorAll(".import-check:checked").length;
+    document.getElementById("selected-count").textContent = count;
+  }
+
+  async function importarSelecionados() {
+    const checks = document.querySelectorAll(".import-check:checked");
+    if (checks.length === 0) {
+      alert("Selecione pelo menos um livro para importar.");
+      return;
+    }
+
+    const selecionados = [...checks].map(c => importData[parseInt(c.dataset.index)]);
+    const btn = document.getElementById("btn-importar");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+
+    try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+      const resp = await fetch("/admin/importar/salvar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken,
+        },
+        body: JSON.stringify({ livros: selecionados }),
+      });
+
+      if (!resp.ok) throw new Error("Erro ao salvar");
+      const data = await resp.json();
+
+      alert(`Importação concluída!\n+${data.inseridos} novos livros\n~${data.atualizados} atualizados`);
+      // Desmarcar tudo
+      document.querySelectorAll(".import-check").forEach(c => c.checked = false);
+      updateSelectedCount();
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao importar os livros selecionados.");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-download"></i> Importar Selecionados (<span id="selected-count">0</span>)';
+    }
+  }
+
+  // Enter para buscar
+  document.getElementById("import-query")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") buscarParaImportar();
+  });
+</script>
+{% endblock %}

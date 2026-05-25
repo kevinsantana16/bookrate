@@ -1,0 +1,6 @@
+flask>=3.0
+flask-wtf>=1.2
+bcrypt>=4.0
+
+# Integração Google Books API (opcional — urllib da stdlib também funciona)
+# requests>=2.31

@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Início — BookRate{% endblock %}
+
+{% block content %}
+<div class="home-wrapper">
+
+  <!-- ── HERO HEADER ── -->
+  <header class="home-header">
+    <div class="home-header-text">
+      <h1><i class="fas fa-book-open"></i> Catálogo de Livros</h1>
+      <p>Descubra novos livros e compartilhe sua opinião</p>
+    </div>
+    <div class="home-stats">
+      <div class="stat-pill">
+        <i class="fas fa-book"></i>
+        <span id="stat-total">{{ total_livros }}</span> livros
+      </div>
+      <div class="stat-pill">
+        <i class="fas fa-file-alt"></i>
+        Página <span id="stat-pagina">{{ pagina }}</span> de <span id="stat-total-pags">{{ total_paginas }}</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── SEARCH BAR ── -->
+  <div class="search-container">
+    <div class="search-box">
+      <i class="fas fa-search search-icon"></i>
+      <input
+        id="search-input"
+        type="text"
+        placeholder="Buscar por título ou autor..."
+        value="{{ filtro }}"
+        autocomplete="off"
+        oninput="onSearch()"
+      />
+      <button class="search-clear" id="search-clear" onclick="clearSearch()" {% if not filtro %}style="display:none"{% endif %}>
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── GRID DE CARDS ── -->
+  <div id="cards-grid" class="cards-grid">
+    {% for livro in livros %}
+    <article class="book-card" id="card-{{ livro.id }}" data-livro-id="{{ livro.id }}">
+
+      <!-- Capa (clicável → página de detalhes) -->
+      <a href="{{ url_for('livro_detalhe', livro_id=livro.id) }}" class="card-cover-link">
+        <div class="card-cover">
+          {% if livro.capa_url %}
+            <img
+              src="{{ livro.capa_url }}"
+              alt="Capa de {{ livro.titulo }}"
+              class="cover-img"
+              loading="lazy"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+            />
+            <div class="cover-fallback" style="display:none">
+              <i class="fas fa-book"></i>
+            </div>
+          {% else %}
+            <div class="cover-fallback">
+              <i class="fas fa-book"></i>
+            </div>
+          {% endif %}
+
+          <!-- Badge idioma -->
+          {% if livro.idioma %}
+          <span class="lang-badge">{{ livro.idioma | upper }}</span>
+          {% endif %}
+        </div>
+      </a>
+
+      <!-- Corpo -->
+      <div class="card-body">
+        <a href="{{ url_for('livro_detalhe', livro_id=livro.id) }}" class="card-title-link">
+          <h2 class="card-title">{{ livro.titulo }}</h2>
+        </a>
+        <p class="card-author">
+          <i class="fas fa-pen-nib"></i> {{ livro.autor }}
+        </p>
+
+        <!-- Descrição -->
+        {% if livro.descricao %}
+        <p class="card-desc">{{ livro.descricao }}</p>
+        {% endif %}
+
+        <!-- Metadados -->
+        <div class="card-meta">
+          {% if livro.editora %}
+          <span class="meta-item" title="Editora">
+            <i class="fas fa-building"></i> {{ livro.editora }}
+          </span>
+          {% endif %}
+          {% if livro.total_paginas %}
+          <span class="meta-item" title="Páginas">
+            <i class="fas fa-file-alt"></i> {{ livro.total_paginas }} pág.
+          </span>
+          {% endif %}
+          {% if livro.data_publicacao %}
+          <span class="meta-item" title="Publicação">
+            <i class="fas fa-calendar-alt"></i> {{ livro.data_publicacao[:4] }}
+          </span>
+          {% endif %}
+        </div>
+
+        <!-- Categorias -->
+        {% if livro.categorias %}
+        <div class="card-tags">
+          {% for cat in livro.categorias[:3] %}
+          <span class="tag">{{ cat }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Lista de Leitura -->
+        <div class="reading-status-wrap">
+          <select
+            class="reading-status-select"
+            id="reading-{{ livro.id }}"
+            onchange="atualizarListaLeitura({{ livro.id }}, this.value)"
+            title="Lista de leitura"
+          >
+            <option value="" {% if not livro.status_leitura %}selected{% endif %}>📚 Adicionar à lista</option>
+            <option value="quero_ler" {% if livro.status_leitura == 'quero_ler' %}selected{% endif %}>📖 Quero Ler</option>
+            <option value="lendo" {% if livro.status_leitura == 'lendo' %}selected{% endif %}>📕 Lendo</option>
+            <option value="lido" {% if livro.status_leitura == 'lido' %}selected{% endif %}>✅ Lido</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Footer — votos -->
+      <div class="card-footer">
+        <button
+          class="vote-btn vote-yes {% if livro.meu_voto == 1 %}voted{% endif %}"
+          id="btn-yes-{{ livro.id }}"
+          onclick="votar({{ livro.id }}, 1)"
+          title="Recomendo"
+        >
+          <i class="fas fa-thumbs-up"></i>
+          <span class="vote-count" id="count-yes-{{ livro.id }}">{{ livro.recomendo }}</span>
+        </button>
+        <div class="vote-divider"></div>
+        <button
+          class="vote-btn vote-no {% if livro.meu_voto == 0 %}voted{% endif %}"
+          id="btn-no-{{ livro.id }}"
+          onclick="votar({{ livro.id }}, 0)"
+          title="Não Recomendo"
+        >
+          <i class="fas fa-thumbs-down"></i>
+          <span class="vote-count" id="count-no-{{ livro.id }}">{{ livro.nao_recomendo }}</span>
+        </button>
+      </div>
+
+    </article>
+    {% else %}
+    <div class="empty-state" id="empty-state">
+      <i class="fas fa-search"></i>
+      <p>Nenhum livro encontrado para "<strong>{{ filtro }}</strong>"</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ── PAGINAÇÃO ── -->
+  <nav class="pagination" id="pagination" aria-label="Paginação">
+    <button
+      class="page-btn"
+      id="btn-prev"
+      onclick="mudarPagina({{ pagina - 1 }})"
+      {% if pagina <= 1 %}disabled{% endif %}
+    >
+      <i class="fas fa-chevron-left"></i> Anterior
+    </button>
+
+    <div class="page-info" id="page-info">
+      Página <strong>{{ pagina }}</strong> de <strong>{{ total_paginas }}</strong>
+    </div>
+
+    <button
+      class="page-btn"
+      id="btn-next"
+      onclick="mudarPagina({{ pagina + 1 }})"
+      {% if pagina >= total_paginas %}disabled{% endif %}
+    >
+      Próxima <i class="fas fa-chevron-right"></i>
+    </button>
+  </nav>
+
+</div><!-- /home-wrapper -->
+
+<!-- Estado JS para paginação -->
+<script>
+  window.ESTADO = {
+    pagina: {{ pagina }},
+    totalPaginas: {{ total_paginas }},
+    filtro: {{ filtro | tojson }},
+  };
+</script>
+{% endblock %}

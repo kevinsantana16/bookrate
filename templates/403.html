@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Acesso Negado — BookRate{% endblock %}
+{% block content %}
+<div class="error-wrapper">
+  <div class="error-card">
+    <div class="error-icon"><i class="fas fa-lock"></i></div>
+    <h1>403 — Acesso Negado</h1>
+    <p>Você não tem permissão para acessar esta página.</p>
+    <a href="{{ url_for('home') }}" class="btn btn-primary">
+      <i class="fas fa-home"></i> Voltar ao Início
+    </a>
+  </div>
+</div>
+{% endblock %}

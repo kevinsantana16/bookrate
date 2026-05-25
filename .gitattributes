@@ -1,0 +1,41 @@
+# .gitattributes — BookRate
+# Define o tratamento de fim de linha para todos os colaboradores,
+# independente do sistema operacional (Windows, Linux, macOS).
+#
+# Regra: o repositório armazena sempre LF (padrão Unix/GitHub).
+# O Git converte automaticamente para o SO de cada colaborador.
+
+# Comportamento padrão: normalizar tudo para LF no repositório
+* text=auto eol=lf
+
+# Python — sempre LF
+*.py text eol=lf
+
+# Templates e web
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+
+# Configs e documentação
+*.txt  text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.env  text eol=lf
+*.example text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Scripts Windows — CRLF (necessário para .bat funcionar no Windows)
+*.bat text eol=crlf
+
+# Binários — sem conversão de linha
+*.db    binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}{{ livro.titulo }} — BookRate{% endblock %}
+
+{% block content %}
+<div class="detail-wrapper">
+
+  <!-- ── BACK NAV ── -->
+  <a href="{{ url_for('home') }}" class="detail-back">
+    <i class="fas fa-arrow-left"></i> Voltar ao Catálogo
+  </a>
+
+  <!-- ── LIVRO HEADER ── -->
+  <div class="detail-hero">
+    <div class="detail-cover">
+      {% if livro.capa_url %}
+        <img
+          src="{{ livro.capa_url }}"
+          alt="Capa de {{ livro.titulo }}"
+          class="detail-cover-img"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+        />
+        <div class="cover-fallback detail-cover-fallback" style="display:none">
+          <i class="fas fa-book"></i>
+        </div>
+      {% else %}
+        <div class="cover-fallback detail-cover-fallback">
+          <i class="fas fa-book"></i>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="detail-info">
+      <h1 class="detail-title">{{ livro.titulo }}</h1>
+      <p class="detail-author"><i class="fas fa-pen-nib"></i> {{ livro.autor }}</p>
+
+      <!-- Metadados -->
+      <div class="detail-meta">
+        {% if livro.editora %}
+        <span class="meta-item"><i class="fas fa-building"></i> {{ livro.editora }}</span>
+        {% endif %}
+        {% if livro.total_paginas %}
+        <span class="meta-item"><i class="fas fa-file-alt"></i> {{ livro.total_paginas }} páginas</span>
+        {% endif %}
+        {% if livro.data_publicacao %}
+        <span class="meta-item"><i class="fas fa-calendar-alt"></i> {{ livro.data_publicacao }}</span>
+        {% endif %}
+        {% if livro.idioma %}
+        <span class="meta-item"><i class="fas fa-globe"></i> {{ livro.idioma | upper }}</span>
+        {% endif %}
+        {% if livro.isbn_13 %}
+        <span class="meta-item"><i class="fas fa-barcode"></i> ISBN: {{ livro.isbn_13 }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Categorias -->
+      {% if livro.categorias %}
+      <div class="detail-tags">
+        {% for cat in livro.categorias %}
+        <span class="tag">{{ cat }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Votos -->
+      <div class="detail-votes">
+        <button
+          class="vote-btn vote-yes {% if livro.meu_voto == 1 %}voted{% endif %}"
+          id="btn-yes-{{ livro.id }}"
+          onclick="votar({{ livro.id }}, 1)"
+          title="Recomendo"
+        >
+          <i class="fas fa-thumbs-up"></i>
+          <span class="vote-count" id="count-yes-{{ livro.id }}">{{ livro.recomendo }}</span>
+          <span class="vote-label">Recomendo</span>
+        </button>
+        <div class="vote-divider"></div>
+        <button
+          class="vote-btn vote-no {% if livro.meu_voto == 0 %}voted{% endif %}"
+          id="btn-no-{{ livro.id }}"
+          onclick="votar({{ livro.id }}, 0)"
+          title="Não Recomendo"
+        >
+          <i class="fas fa-thumbs-down"></i>
+          <span class="vote-count" id="count-no-{{ livro.id }}">{{ livro.nao_recomendo }}</span>
+          <span class="vote-label">Não Recomendo</span>
+        </button>
+      </div>
+
+      <!-- Lista de Leitura -->
+      <div class="detail-reading-status">
+        <label><i class="fas fa-bookmark"></i> Lista de Leitura:</label>
+        <select
+          class="reading-status-select"
+          id="reading-{{ livro.id }}"
+          onchange="atualizarListaLeitura({{ livro.id }}, this.value)"
+        >
+          <option value="" {% if not status_leitura %}selected{% endif %}>Nenhum</option>
+          <option value="quero_ler" {% if status_leitura == 'quero_ler' %}selected{% endif %}>📖 Quero Ler</option>
+          <option value="lendo" {% if status_leitura == 'lendo' %}selected{% endif %}>📕 Lendo</option>
+          <option value="lido" {% if status_leitura == 'lido' %}selected{% endif %}>✅ Lido</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DESCRIÇÃO ── -->
+  {% if livro.descricao %}
+  <section class="detail-section">
+    <h2><i class="fas fa-align-left"></i> Sinopse</h2>
+    <p class="detail-description">{{ livro.descricao }}</p>
+  </section>
+  {% endif %}
+
+  <!-- ── COMENTÁRIOS / RESENHAS ── -->
+  <section class="detail-section">
+    <h2><i class="fas fa-comments"></i> Resenhas ({{ comentarios | length }})</h2>
+
+    <!-- Formulário de nova resenha -->
+    <div class="comment-form-wrap">
+      <textarea
+        id="comment-input"
+        placeholder="Escreva sua resenha sobre este livro..."
+        maxlength="2000"
+        rows="3"
+      ></textarea>
+      <div class="comment-form-footer">
+        <span class="comment-char-count" id="comment-char-count">0 / 2000</span>
+        <button class="btn btn-primary" onclick="enviarComentario({{ livro.id }})" id="btn-comentar">
+          <i class="fas fa-paper-plane"></i> Publicar Resenha
+        </button>
+      </div>
+    </div>
+
+    <!-- Lista de resenhas -->
+    <div id="comments-list" class="comments-list">
+      {% if comentarios %}
+        {% for c in comentarios %}
+        <div class="comment-card" id="comment-{{ c.id }}">
+          <div class="comment-header">
+            <span class="comment-author">
+              <i class="fas fa-user-circle"></i> {{ c.username }}
+              {% if c.is_admin %}
+              <span class="badge-admin" style="font-size:0.6rem">Admin</span>
+              {% endif %}
+            </span>
+            <span class="comment-date">{{ c.criado_em }}</span>
+          </div>
+          <p class="comment-text">{{ c.texto }}</p>
+          {% if c.usuario_id == session.usuario_id or session.get('is_admin') %}
+          <button class="comment-delete" onclick="excluirComentario({{ c.id }})" title="Excluir">
+            <i class="fas fa-trash"></i>
+          </button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state" id="empty-comments" style="padding:2rem">
+          <i class="fas fa-comment-slash" style="font-size:2rem"></i>
+          <p>Nenhuma resenha ainda. Seja o primeiro a compartilhar sua opinião!</p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+</div><!-- /detail-wrapper -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Contador de caracteres
+  const commentInput = document.getElementById("comment-input");
+  const charCount = document.getElementById("comment-char-count");
+  if (commentInput) {
+    commentInput.addEventListener("input", () => {
+      charCount.textContent = `${commentInput.value.length} / 2000`;
+    });
+  }
+</script>
+{% endblock %}

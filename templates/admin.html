@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Administração — BookRate{% endblock %}
+
+{% block content %}
+<div class="admin-wrapper">
+
+  <header class="admin-header">
+    <div>
+      <h1><i class="fas fa-cog"></i> Gerenciar Livros</h1>
+      <p>Adicione, edite ou remova livros do catálogo</p>
+    </div>
+    <div class="admin-header-actions">
+      <a href="{{ url_for('admin_importar') }}" class="btn btn-primary">
+        <i class="fas fa-cloud-download-alt"></i> Importar do Google Books
+      </a>
+      <a href="{{ url_for('home') }}" class="btn btn-outline-sm">
+        <i class="fas fa-arrow-left"></i> Voltar ao Catálogo
+      </a>
+    </div>
+  </header>
+
+  <!-- ── FORMULÁRIO: NOVO LIVRO ── -->
+  <section class="admin-card">
+    <h2 class="section-title">
+      <i class="fas fa-plus-circle"></i> Adicionar Novo Livro
+    </h2>
+    <form method="POST" action="{{ url_for('admin_novo_livro') }}" class="admin-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div class="admin-form-row">
+        <div class="form-group">
+          <label for="novo-titulo"><i class="fas fa-book"></i> Título</label>
+          <input id="novo-titulo" type="text" name="titulo" placeholder="Título do livro" required />
+        </div>
+        <div class="form-group">
+          <label for="novo-autor"><i class="fas fa-pen-nib"></i> Autor</label>
+          <input id="novo-autor" type="text" name="autor" placeholder="Nome do autor" required />
+        </div>
+        <div class="form-group form-group-btn">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Adicionar
+          </button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <!-- ── TABELA DE LIVROS ── -->
+  <section class="admin-card">
+    <h2 class="section-title">
+      <i class="fas fa-list"></i> Catálogo ({{ livros | length }} livros)
+    </h2>
+
+    {% if livros %}
+    <div class="table-wrapper">
+      <table class="admin-table" id="admin-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th style="width:54px">Capa</th>
+            <th>Título</th>
+            <th>Autor</th>
+            <th>Editora</th>
+            <th>Págs.</th>
+            <th>Idioma</th>
+            <th class="col-actions">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for livro in livros %}
+          <tr id="row-{{ livro.id }}">
+            <td class="col-id">{{ livro.id }}</td>
+            <td style="width:54px;padding:6px 10px">
+              {% if livro.capa_url %}
+              <img src="{{ livro.capa_url }}" alt="" style="width:38px;height:54px;object-fit:cover;border-radius:4px;display:block">
+              {% else %}
+              <div style="width:38px;height:54px;background:rgba(124,106,247,0.15);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:1rem">
+                <i class="fas fa-book"></i>
+              </div>
+              {% endif %}
+            </td>
+            <td class="col-titulo" id="titulo-{{ livro.id }}">{{ livro.titulo }}</td>
+            <td class="col-autor" id="autor-{{ livro.id }}">{{ livro.autor }}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted)">{{ livro.editora or '—' }}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted)">{{ livro.total_paginas or '—' }}</td>
+            <td style="font-size:0.78rem">
+              {% if livro.idioma %}
+              <span style="background:rgba(124,106,247,0.1);border:1px solid rgba(124,106,247,0.25);color:var(--accent-light);padding:2px 8px;border-radius:20px;font-size:0.68rem;font-weight:700">
+                {{ livro.idioma | upper }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="col-actions">
+              <!-- Botão Editar abre o modal -->
+              <button
+                class="btn btn-edit-sm"
+                onclick="abrirModal({{ livro.id }}, {{ livro.titulo | tojson }}, {{ livro.autor | tojson }})"
+                title="Editar livro"
+              >
+                <i class="fas fa-edit"></i>
+              </button>
+              <!-- Botão Excluir -->
+              <form
+                method="POST"
+                action="{{ url_for('admin_excluir_livro', livro_id=livro.id) }}"
+                data-titulo="{{ livro.titulo }}"
+                onsubmit="return confirm('Excluir o livro &quot;' + this.dataset.titulo + '&quot;? Esta acao nao pode ser desfeita.')"
+                style="display:inline"
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="btn btn-delete-sm" title="Excluir livro">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <i class="fas fa-book-open"></i>
+      <p>Nenhum livro cadastrado ainda.</p>
+    </div>
+    {% endif %}
+  </section>
+
+</div><!-- /admin-wrapper -->
+
+<!-- ── MODAL DE EDIÇÃO ── -->
+<div class="modal-overlay" id="modal-overlay" onclick="fecharModal()" style="display:none">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-edit"></i> Editar Livro</h3>
+      <button class="modal-close" onclick="fecharModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <form id="form-editar" method="POST" action="">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div class="form-group">
+        <label for="edit-titulo"><i class="fas fa-book"></i> Título</label>
+        <input id="edit-titulo" type="text" name="titulo" required />
+      </div>
+      <div class="form-group">
+        <label for="edit-autor"><i class="fas fa-pen-nib"></i> Autor</label>
+        <input id="edit-autor" type="text" name="autor" required />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost-sm" onclick="fecharModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-save"></i> Salvar Alterações
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function abrirModal(id, titulo, autor) {
+    document.getElementById("edit-titulo").value = titulo;
+    document.getElementById("edit-autor").value = autor;
+    document.getElementById("form-editar").action = `/admin/livro/editar/${id}`;
+    const overlay = document.getElementById("modal-overlay");
+    overlay.style.display = "flex";
+    setTimeout(() => overlay.classList.add("visible"), 10);
+  }
+
+  function fecharModal() {
+    const overlay = document.getElementById("modal-overlay");
+    overlay.classList.remove("visible");
+    setTimeout(() => overlay.style.display = "none", 250);
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") fecharModal();
+  });
+</script>
+{% endblock %}

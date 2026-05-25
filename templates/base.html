@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Avaliação de Livros{% endblock %}</title>
+  <meta name="description" content="Sistema de avaliação de livros — recomende ou não os seus favoritos." />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  <!-- ── NAVBAR ── -->
+  {% if session.get('username') %}
+  <nav class="navbar">
+    <a href="{{ url_for('home') }}" class="nav-brand">
+      <i class="fas fa-book-open"></i>
+      <span>BookRate</span>
+    </a>
+    <div class="nav-actions">
+      <span class="nav-user">
+        <i class="fas fa-user-circle"></i>
+        {{ session.username }}
+        {% if session.get('is_admin') %}
+          <span class="badge-admin">Admin</span>
+        {% endif %}
+      </span>
+      {% if session.get('is_admin') %}
+        <a href="{{ url_for('admin') }}" class="btn btn-outline-sm">
+          <i class="fas fa-cog"></i> Gerenciar
+        </a>
+      {% endif %}
+      <a href="{{ url_for('logout') }}" class="btn btn-ghost-sm">
+        <i class="fas fa-sign-out-alt"></i> Sair
+      </a>
+    </div>
+  </nav>
+  {% endif %}
+
+  <!-- ── FLASH MESSAGES ── -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-container">
+        {% for category, msg in messages %}
+          <div class="flash flash-{{ category }}">
+            <i class="fas {% if category == 'success' %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}"></i>
+            {{ msg }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- ── CONTENT ── -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- ── SCRIPTS ── -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
