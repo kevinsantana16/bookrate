@@ -1,8 +1,7 @@
 # BookRate 📚
 
 > Sistema web de avaliação de livros com busca integrada à Google Books API.
-
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+> 
 ![Flask](https://img.shields.io/badge/Flask-3.0%2B-green)
 ![SQLite](https://img.shields.io/badge/Database-SQLite-lightgrey)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
@@ -22,70 +21,11 @@
 
 ---
 
-## 🚀 Como Rodar (Windows — Forma Rápida)
-
-1. Certifique-se de ter o **Python 3.10+** instalado  
-   → [https://www.python.org/downloads/](https://www.python.org/downloads/)  
-   ⚠️ Marque **"Add Python to PATH"** durante a instalação
-
-2. Clone o repositório:
-   ```bash
-   git clone https://github.com/SEU_USUARIO/bookrate.git
-   cd bookrate
-   ```
-
-3. Configure as variáveis de ambiente:
-   ```bash
-   copy .env.example .env
-   ```
-   Edite o `.env` e defina uma `FLASK_SECRET_KEY` segura:
-   ```
-   FLASK_SECRET_KEY=sua_chave_secreta_aqui
-   ```
-   > 💡 Gere uma chave com: `python -c "import secrets; print(secrets.token_hex(32))"`
-
-4. Clique duas vezes em **`iniciar.bat`** ou execute no terminal:
-   ```bash
-   iniciar.bat
-   ```
-
-5. Acesse: **http://127.0.0.1:5000**
-
----
-
-## 🚀 Como Rodar (Linux / macOS)
-
-```bash
-# 1. Clone o repositório
-git clone https://github.com/SEU_USUARIO/bookrate.git
-cd bookrate
-
-# 2. Crie e ative o ambiente virtual
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 3. Instale as dependências
-pip install -r requirements.txt
-
-# 4. Configure as variáveis de ambiente
-cp .env.example .env
-# Edite .env e defina FLASK_SECRET_KEY
-
-# 5. Inicie o servidor
-python app.py
-```
-
-Acesse: **http://127.0.0.1:5000**
-
----
-
 ## 🔑 Acesso Admin Padrão
 
 | Usuário | Senha |
 |---------|-------|
 | `admin` | `admin123` |
-
-> ⚠️ **IMPORTANTE**: Troque a senha do admin após o primeiro login em produção.
 
 ---
 
