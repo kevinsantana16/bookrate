@@ -19,6 +19,12 @@
 - 🛡️ **Proteção CSRF** em todos os formulários
 - 📄 **Paginação** na listagem de livros
 
+- <img width="1900" height="916" alt="image" src="https://github.com/user-attachments/assets/f40c6e03-c053-40f9-8f7c-912154309800" />
+
+<img width="1904" height="917" alt="image" src="https://github.com/user-attachments/assets/2ff260e3-ca92-4e91-8d0c-321a20eada40" />
+
+
+
 ---
 
 ## 🔑 Acesso Admin Padrão
