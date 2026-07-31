@@ -17,7 +17,8 @@ def criar_usuario(username: str, password_hash: str) -> bool:
         )
         conn.commit()
         return True
-    except Exception:
+    except sqlite3.IntegrityError:
+        conn.rollback()
         return False
     finally:
         conn.close()
@@ -33,6 +34,17 @@ def buscar_usuario_por_username(username: str):
     return row
 
 
+def buscar_usuario_por_id(usuario_id: int):
+    """Retorna um usuario pelo ID ou None."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id, username, is_admin FROM usuarios WHERE id = ?",
+        (usuario_id,),
+    ).fetchone()
+    conn.close()
+    return row
+
+
 # ──────────────────────────────────────────────
 # LIVROS
 # ──────────────────────────────────────────────
@@ -42,7 +54,8 @@ def _deserializar_categorias(livro: dict) -> dict:
     raw = livro.get("categorias")
     if raw:
         try:
-            livro["categorias"] = json.loads(raw)
+            categorias = json.loads(raw)
+            livro["categorias"] = categorias if isinstance(categorias, list) else [str(categorias)]
         except (json.JSONDecodeError, TypeError):
             livro["categorias"] = [raw]
     else:

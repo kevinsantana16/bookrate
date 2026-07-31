@@ -170,7 +170,7 @@ function renderizarCards(livros, filtro) {
     // Metadados
     const metaItems = [
       livro.editora       ? `<span class="meta-item" title="Editora"><i class="fas fa-building"></i> ${escapeHtml(livro.editora)}</span>` : "",
-      livro.total_paginas ? `<span class="meta-item" title="Páginas"><i class="fas fa-file-alt"></i> ${livro.total_paginas} pág.</span>` : "",
+      livro.total_paginas ? `<span class="meta-item" title="Páginas"><i class="fas fa-file-alt"></i> ${escapeHtml(String(livro.total_paginas))} pág.</span>` : "",
       livro.data_publicacao ? `<span class="meta-item" title="Publicação"><i class="fas fa-calendar-alt"></i> ${escapeHtml(String(livro.data_publicacao).slice(0,4))}</span>` : "",
     ].join("");
     const metaHtml = metaItems ? `<div class="card-meta">${metaItems}</div>` : "";

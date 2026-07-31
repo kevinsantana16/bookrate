@@ -30,11 +30,11 @@
       <div class="admin-form-row">
         <div class="form-group">
           <label for="novo-titulo"><i class="fas fa-book"></i> Título</label>
-          <input id="novo-titulo" type="text" name="titulo" placeholder="Título do livro" required />
+          <input id="novo-titulo" type="text" name="titulo" placeholder="Título do livro" maxlength="300" required />
         </div>
         <div class="form-group">
           <label for="novo-autor"><i class="fas fa-pen-nib"></i> Autor</label>
-          <input id="novo-autor" type="text" name="autor" placeholder="Nome do autor" required />
+          <input id="novo-autor" type="text" name="autor" placeholder="Nome do autor" maxlength="300" required />
         </div>
         <div class="form-group form-group-btn">
           <button type="submit" class="btn btn-primary">
@@ -141,11 +141,11 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <div class="form-group">
         <label for="edit-titulo"><i class="fas fa-book"></i> Título</label>
-        <input id="edit-titulo" type="text" name="titulo" required />
+        <input id="edit-titulo" type="text" name="titulo" maxlength="300" required />
       </div>
       <div class="form-group">
         <label for="edit-autor"><i class="fas fa-pen-nib"></i> Autor</label>
-        <input id="edit-autor" type="text" name="autor" required />
+        <input id="edit-autor" type="text" name="autor" maxlength="300" required />
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost-sm" onclick="fecharModal()">Cancelar</button>

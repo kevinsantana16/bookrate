@@ -55,19 +55,21 @@ def _get(url: str) -> dict:
                 return json.loads(resp.read().decode("utf-8"))
 
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 503):
+            if e.code in (429, 500, 502, 503, 504):
                 print(
                     f"[API] Erro HTTP {e.code}. "
                     f"Aguardando {delay}s (tentativa {tentativa}/{MAX_RETRIES})..."
                 )
-                time.sleep(delay)
+                if tentativa < MAX_RETRIES:
+                    time.sleep(delay)
                 delay *= 2  # dobra o tempo a cada tentativa
             else:
                 raise  # outros erros HTTP são relançados imediatamente
 
         except urllib.error.URLError as e:
             print(f"[API] Erro de rede: {e.reason}. Aguardando {delay}s...")
-            time.sleep(delay)
+            if tentativa < MAX_RETRIES:
+                time.sleep(delay)
             delay *= 2
 
     raise RuntimeError(f"[API] Falha após {MAX_RETRIES} tentativas. URL: {url}")
@@ -120,11 +122,14 @@ def buscar_livros(query: str, api_key: str = None, lang: str = None) -> list:
                 livros.append(livro_mapeado)
 
         start_index += len(items)
-        total_items = data.get("totalItems", 0)
-
-        # Para quando atingir o total real ou o limite de segurança
-        if start_index >= min(total_items, LIMITE_SEGURANCA):
-            print(f"[API] Limite atingido ({start_index}/{total_items} items). Parando.")
+        total_items = data.get("totalItems")
+        if isinstance(total_items, int) and total_items > 0:
+            # Para quando atingir o total real ou o limite de segurança.
+            if start_index >= min(total_items, LIMITE_SEGURANCA):
+                print(f"[API] Limite atingido ({start_index}/{total_items} items). Parando.")
+                break
+        elif len(items) < MAX_RESULTS or start_index >= LIMITE_SEGURANCA:
+            # Resposta sem totalItems: uma página incompleta indica o fim.
             break
 
         time.sleep(DELAY_ENTRE_PAGINAS)  # pausa entre páginas → respeita Rate Limit
@@ -155,8 +160,13 @@ def _mapear_volume(item: dict):
 
     Retorna None se o título estiver ausente (item inválido).
     """
+    if not isinstance(item, dict):
+        return None
+
     google_books_id = item.get("id")
-    info: dict = item.get("volumeInfo", {})
+    info: dict = item.get("volumeInfo") or {}
+    if not isinstance(info, dict):
+        return None
 
     titulo = info.get("title")
     if not titulo:
@@ -164,11 +174,18 @@ def _mapear_volume(item: dict):
 
     # Autores: lista → string concatenada (retrocompatível com campo 'autor' TEXT)
     autores = info.get("authors") or ["Autor Desconhecido"]
+    if not isinstance(autores, list) or not all(isinstance(autor, str) for autor in autores):
+        autores = ["Autor Desconhecido"]
     autor = ", ".join(autores)
 
     # ISBNs: percorre a lista de identificadores
     isbn_13 = isbn_10 = None
-    for identificador in info.get("industryIdentifiers", []):
+    identificadores = info.get("industryIdentifiers") or []
+    if not isinstance(identificadores, list):
+        identificadores = []
+    for identificador in identificadores:
+        if not isinstance(identificador, dict):
+            continue
         tipo = identificador.get("type", "")
         valor = identificador.get("identifier")
         if tipo == "ISBN_13":
@@ -181,9 +198,15 @@ def _mapear_volume(item: dict):
     categorias = json.dumps(categorias_lista, ensure_ascii=False)
 
     # URL da capa: prefere https (segurança)
-    capa_url = info.get("imageLinks", {}).get("thumbnail") or ""
-    if capa_url:
-        capa_url = capa_url.replace("http://", "https://")
+    image_links = info.get("imageLinks") or {}
+    capa_url = image_links.get("thumbnail") if isinstance(image_links, dict) else ""
+    if isinstance(capa_url, str) and capa_url:
+        capa_url = capa_url.replace("http://", "https://", 1)
+        parsed_url = urllib.parse.urlparse(capa_url)
+        if parsed_url.scheme != "https" or not parsed_url.netloc:
+            capa_url = ""
+    else:
+        capa_url = ""
 
     return {
         "google_books_id": google_books_id,

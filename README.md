@@ -27,11 +27,11 @@
 
 ---
 
-## 🔑 Acesso Admin Padrão
+## 🔑 Administrador inicial
 
-| Usuário | Senha |
-|---------|-------|
-| `admin` | `admin123` |
+Em um banco novo, defina `BOOKRATE_ADMIN_USERNAME` e
+`BOOKRATE_ADMIN_PASSWORD` no `.env` antes da primeira inicialização. Não existe
+mais uma senha administrativa padrão no código.
 
 ---
 
@@ -42,6 +42,10 @@ Copie `.env.example` para `.env` e configure:
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
 | `FLASK_SECRET_KEY` | ✅ Sim | Chave para assinar cookies de sessão |
+| `APP_ENV` | ❌ Não | Use `production` para ativar proteções de produção |
+| `FLASK_DEBUG` | ❌ Não | Deve permanecer `0` em produção |
+| `BOOKRATE_ADMIN_USERNAME` | ❌ Não | Usuário administrador inicial |
+| `BOOKRATE_ADMIN_PASSWORD` | ❌ Não | Senha do administrador inicial |
 | `GOOGLE_BOOKS_API_KEY` | ❌ Não | Chave da Google Books API (aumenta limites) |
 | `GOOGLE_BOOKS_LANG` | ❌ Não | Filtro de idioma (`pt`, `en`, etc.) |
 
@@ -62,7 +66,7 @@ pytest test_auth.py test_models.py test_google_books_client.py test_app_routes.p
 pytest test_auth.py test_models.py test_google_books_client.py test_app_routes.py --cov=. --cov-report=term-missing
 ```
 
-> ✅ A suíte tem **142 testes** e usa banco SQLite in-memory (sem estado persistente).
+> ✅ A suíte tem **151 testes** e usa banco SQLite in-memory (sem estado persistente).
 
 ---
 

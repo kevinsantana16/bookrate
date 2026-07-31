@@ -51,7 +51,7 @@ echo  Iniciando o servidor...
 echo ============================================
 echo.
 echo  Acesse:  http://127.0.0.1:5000
-echo  Admin:   usuario=admin  senha=admin123
+echo  Configure BOOKRATE_ADMIN_USERNAME/PASSWORD no .env para criar o admin inicial.
 echo.
 echo  Pressione Ctrl+C para encerrar o servidor.
 echo ============================================

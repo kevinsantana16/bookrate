@@ -7,8 +7,7 @@ Como usar:
     python google_books_seeder.py
 
 Responsabilidades:
-  1. Migração idempotente: adiciona novas colunas à tabela 'livros'
-     se ainda não existirem (seguro para re-execução).
+  1. Inicialização/migração do schema delegada a database.init_db().
   2. Busca livros via google_books_client (paginação + backoff).
   3. Persistência via Upsert — padrão ON CONFLICT idêntico ao
      usado em models.py (registrar_ou_atualizar_voto).
@@ -87,50 +86,6 @@ QUERIES_DE_BUSCA: list[str] = [
 
 
 # ──────────────────────────────────────────────
-# MIGRAÇÃO — adiciona colunas novas (idempotente)
-# ──────────────────────────────────────────────
-
-_NOVAS_COLUNAS = [
-    ("google_books_id", "TEXT"),
-    ("isbn_13",         "TEXT"),
-    ("isbn_10",         "TEXT"),
-    ("descricao",       "TEXT"),
-    ("categorias",      "TEXT"),
-    ("capa_url",        "TEXT"),
-    ("total_paginas",   "INTEGER"),
-    ("data_publicacao", "TEXT"),
-    ("editora",         "TEXT"),
-    ("idioma",          "TEXT"),
-]
-
-
-def _garantir_colunas(conn) -> None:
-    """
-    Adiciona as colunas novas à tabela 'livros' se ainda não existirem.
-    Usa PRAGMA table_info para introspecção — totalmente seguro para
-    re-execução sem erros (idempotente).
-    """
-    colunas_existentes = {
-        row[1]
-        for row in conn.execute("PRAGMA table_info(livros)").fetchall()
-    }
-
-    for nome, tipo in _NOVAS_COLUNAS:
-        if nome not in colunas_existentes:
-            conn.execute(f"ALTER TABLE livros ADD COLUMN {nome} {tipo}")
-            print(f"[MIGRAÇÃO] Coluna '{nome}' ({tipo}) adicionada à tabela 'livros'.")
-
-    # Índice único parcial para google_books_id (ignora NULLs dos livros do seed original)
-    conn.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_livros_google_books_id
-        ON livros (google_books_id)
-        WHERE google_books_id IS NOT NULL
-    """)
-    conn.commit()
-    print("[MIGRAÇÃO] Schema verificado e atualizado.")
-
-
-# ──────────────────────────────────────────────
 # PERSISTÊNCIA — Upsert (INSERT ou UPDATE)
 # ──────────────────────────────────────────────
 
@@ -149,51 +104,25 @@ def persistir_livros(livros: list) -> tuple:
     inseridos = 0
     atualizados = 0
 
-    for livro in livros:
-        gid = livro.get("google_books_id")
-        if not gid:
-            continue  # pula entradas sem ID da API
+    try:
+        for livro in livros:
+            if not isinstance(livro, dict):
+                raise ValueError("Cada item importado deve ser um objeto.")
 
-        existe = conn.execute(
-            "SELECT id FROM livros WHERE google_books_id = ?", (gid,)
-        ).fetchone()
+            gid = livro.get("google_books_id")
+            titulo = livro.get("titulo")
+            autor = livro.get("autor")
+            if not isinstance(gid, str) or not gid.strip():
+                continue
+            if not isinstance(titulo, str) or not titulo.strip():
+                raise ValueError("Livro importado sem título.")
+            if not isinstance(autor, str) or not autor.strip():
+                raise ValueError("Livro importado sem autor.")
 
-        if existe:
-            # Livro já na BD → atualiza metadados (Upsert — parte UPDATE)
-            conn.execute(
-                """
-                UPDATE livros SET
-                    titulo          = ?,
-                    autor           = ?,
-                    editora         = ?,
-                    data_publicacao = ?,
-                    descricao       = ?,
-                    isbn_13         = ?,
-                    isbn_10         = ?,
-                    total_paginas   = ?,
-                    categorias      = ?,
-                    idioma          = ?,
-                    capa_url        = ?
-                WHERE google_books_id = ?
-                """,
-                (
-                    livro["titulo"],
-                    livro["autor"],
-                    livro.get("editora"),
-                    livro.get("data_publicacao"),
-                    livro.get("descricao"),
-                    livro.get("isbn_13"),
-                    livro.get("isbn_10"),
-                    livro.get("total_paginas"),
-                    livro.get("categorias"),
-                    livro.get("idioma"),
-                    livro.get("capa_url"),
-                    gid,
-                ),
-            )
-            atualizados += 1
-        else:
-            # Livro novo → insere (Upsert — parte INSERT)
+            existe = conn.execute(
+                "SELECT id FROM livros WHERE google_books_id = ?", (gid,)
+            ).fetchone()
+
             conn.execute(
                 """
                 INSERT INTO livros (
@@ -202,10 +131,22 @@ def persistir_livros(livros: list) -> tuple:
                     isbn_13, isbn_10, total_paginas,
                     categorias, idioma, capa_url
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO UPDATE SET
+                    titulo = excluded.titulo,
+                    autor = excluded.autor,
+                    editora = excluded.editora,
+                    data_publicacao = excluded.data_publicacao,
+                    descricao = excluded.descricao,
+                    isbn_13 = excluded.isbn_13,
+                    isbn_10 = excluded.isbn_10,
+                    total_paginas = excluded.total_paginas,
+                    categorias = excluded.categorias,
+                    idioma = excluded.idioma,
+                    capa_url = excluded.capa_url
                 """,
                 (
-                    livro["titulo"],
-                    livro["autor"],
+                    titulo,
+                    autor,
                     gid,
                     livro.get("editora"),
                     livro.get("data_publicacao"),
@@ -218,10 +159,18 @@ def persistir_livros(livros: list) -> tuple:
                     livro.get("capa_url"),
                 ),
             )
-            inseridos += 1
+            if existe:
+                atualizados += 1
+            else:
+                inseridos += 1
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
     return inseridos, atualizados
 
 
@@ -238,11 +187,7 @@ def main() -> None:
     # 1. Garante que a BD base existe (cria tabelas se necessário)
     init_db()
 
-    # 2. Migração idempotente das novas colunas
-    conn = get_db()
-    _garantir_colunas(conn)
-    conn.close()
-
+    # init_db() é a fonte única de verdade do schema e das migrações.
     total_inseridos = 0
     total_atualizados = 0
     queries_com_erro = []

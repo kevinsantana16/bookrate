@@ -1,16 +1,49 @@
 import sqlite3
 import os
 from auth import hash_senha
+from flask import g, has_app_context
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "livros.db")
 
 
-def get_db():
-    """Retorna uma conexão SQLite com foreign keys ativas."""
-    conn = sqlite3.connect(DB_PATH)
+def _abrir_conexao():
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 10000")
     return conn
+
+
+class _RequestConnection:
+    """Proxy para a conexao compartilhada do request."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def close(self):
+        pass
+
+    def real_close(self):
+        self._conn.close()
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def get_db():
+    """Retorna uma conexão por request Flask ou uma conexão independente."""
+    if has_app_context():
+        if "db" not in g:
+            g.db = _RequestConnection(_abrir_conexao())
+        return g.db
+    return _abrir_conexao()
+
+
+def close_db(conn) -> None:
+    """Fecha conexões independentes, mantendo a conexão do request aberta."""
+    if has_app_context() and getattr(g, "db", None) is conn:
+        return
+    conn.close()
 
 
 def _migrar_colunas(cur):
@@ -30,11 +63,10 @@ def _migrar_colunas(cur):
         ("editora",         "TEXT"),
         ("idioma",          "TEXT"),
     ]
+    existentes = {row[1] for row in cur.execute("PRAGMA table_info(livros)").fetchall()}
     for col, tipo in novas_colunas:
-        try:
+        if col not in existentes:
             cur.execute(f"ALTER TABLE livros ADD COLUMN {col} {tipo}")
-        except sqlite3.OperationalError:
-            pass  # Coluna já existe
 
 
 def init_db():
@@ -116,15 +148,21 @@ def init_db():
     """)
 
     # ── Usuário admin ─────────────────────────────────────────────────────────
-    admin = cur.execute(
-        "SELECT id FROM usuarios WHERE username = 'admin'"
-    ).fetchone()
-    if not admin:
-        cur.execute(
-            "INSERT INTO usuarios (username, password_hash, is_admin) VALUES (?, ?, 1)",
-            ("admin", hash_senha("admin123")),
-        )
-        print("[DB] Usuário admin criado  (senha: admin123)")
+    admin_username = os.environ.get("BOOKRATE_ADMIN_USERNAME")
+    admin_password = os.environ.get("BOOKRATE_ADMIN_PASSWORD")
+    if admin_username and admin_password:
+        senha_bytes = len(admin_password.encode("utf-8"))
+        if len(admin_password) < 12 or senha_bytes > 72:
+            raise ValueError("BOOKRATE_ADMIN_PASSWORD deve ter entre 12 e 72 bytes.")
+        admin = cur.execute(
+            "SELECT id FROM usuarios WHERE username = ?", (admin_username,)
+        ).fetchone()
+        if not admin:
+            cur.execute(
+                "INSERT INTO usuarios (username, password_hash, is_admin) VALUES (?, ?, 1)",
+                (admin_username, hash_senha(admin_password)),
+            )
+            print(f"[DB] Usuário administrador criado: {admin_username}")
 
     conn.commit()
     conn.close()

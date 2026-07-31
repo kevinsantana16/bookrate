@@ -99,7 +99,7 @@ class TestLogout:
     """Testes da rota /logout."""
 
     def test_logout_limpa_sessao(self, client_logado):
-        resp = client_logado.get("/logout", follow_redirects=False)
+        resp = client_logado.post("/logout", follow_redirects=False)
         assert resp.status_code == 302
 
         # Após logout, acesso à home deve redirecionar para login
@@ -443,3 +443,60 @@ class TestErrorHandlers:
     def test_403_para_usuario_comum_em_rota_admin(self, client_logado):
         resp = client_logado.get("/admin")
         assert resp.status_code == 403
+
+
+class TestSecurityAndInputValidation:
+    """Regressoes para validacao, sessao e configuracao segura."""
+
+    def test_json_null_retorna_400(self, client_logado):
+        resp = client_logado.post(
+            "/api/votar",
+            data="null",
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_post_sem_csrf_e_rejeitado(self, csrf_client, usuario_comum, livro_exemplo):
+        with csrf_client.session_transaction() as sess:
+            sess["usuario_id"] = usuario_comum["id"]
+        resp = csrf_client.post(
+            "/api/votar",
+            data=json.dumps({"livro_id": livro_exemplo["id"], "voto": 1}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_livro_inexistente_na_lista_retorna_404(self, client_logado):
+        resp = client_logado.post(
+            "/api/lista-leitura",
+            data=json.dumps({"livro_id": 99999, "status": "lido"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+    def test_senha_acima_do_limite_do_bcrypt_nao_gera_500(self, client):
+        senha = "A" * 73
+        resp = client.post(
+            "/cadastro",
+            data={"username": "senha_longa", "senha": senha, "confirmar": senha},
+        )
+        assert resp.status_code == 302
+
+    def test_permissao_admin_e_revalidada_no_banco(self, client_admin, mem_db):
+        mem_db.execute("UPDATE usuarios SET is_admin = 0 WHERE username = 'admin'")
+        mem_db.commit()
+        resp = client_admin.get("/admin")
+        assert resp.status_code == 403
+
+    def test_resposta_inclui_headers_de_seguranca(self, client):
+        resp = client.get("/login")
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert resp.headers["X-Frame-Options"] == "DENY"
+
+    def test_producao_exige_chave_secreta(self, monkeypatch):
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.delenv("FLASK_SECRET_KEY", raising=False)
+        from app import create_app
+
+        with pytest.raises(RuntimeError, match="FLASK_SECRET_KEY"):
+            create_app()

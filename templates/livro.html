@@ -147,7 +147,7 @@
             <span class="comment-date">{{ c.criado_em }}</span>
           </div>
           <p class="comment-text">{{ c.texto }}</p>
-          {% if c.usuario_id == session.usuario_id or session.get('is_admin') %}
+          {% if c.usuario_id == current_user.id or current_user.is_admin %}
           <button class="comment-delete" onclick="excluirComentario({{ c.id }})" title="Excluir">
             <i class="fas fa-trash"></i>
           </button>

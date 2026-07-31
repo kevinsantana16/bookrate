@@ -179,8 +179,17 @@ def flask_app(patch_get_db):
 
 @pytest.fixture
 def client(flask_app):
-    """Cliente HTTP para os testes de integração das rotas Flask."""
     return flask_app.test_client()
+
+
+@pytest.fixture
+def csrf_client(patch_get_db):
+    """Cliente com CSRF habilitado."""
+    os.environ["FLASK_SECRET_KEY"] = "test-secret-key-para-testes"
+    from app import create_app
+    application = create_app()
+    application.config["TESTING"] = True
+    return application.test_client()
 
 
 @pytest.fixture

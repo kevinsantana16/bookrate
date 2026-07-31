@@ -23,7 +23,7 @@
 <body>
 
   <!-- ── NAVBAR ── -->
-  {% if session.get('username') %}
+  {% if current_user %}
   <nav class="navbar">
     <a href="{{ url_for('home') }}" class="nav-brand">
       <i class="fas fa-book-open"></i>
@@ -32,19 +32,22 @@
     <div class="nav-actions">
       <span class="nav-user">
         <i class="fas fa-user-circle"></i>
-        {{ session.username }}
-        {% if session.get('is_admin') %}
+        {{ current_user.username }}
+        {% if current_user.is_admin %}
           <span class="badge-admin">Admin</span>
         {% endif %}
       </span>
-      {% if session.get('is_admin') %}
+      {% if current_user.is_admin %}
         <a href="{{ url_for('admin') }}" class="btn btn-outline-sm">
           <i class="fas fa-cog"></i> Gerenciar
         </a>
       {% endif %}
-      <a href="{{ url_for('logout') }}" class="btn btn-ghost-sm">
-        <i class="fas fa-sign-out-alt"></i> Sair
-      </a>
+      <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button type="submit" class="btn btn-ghost-sm">
+          <i class="fas fa-sign-out-alt"></i> Sair
+        </button>
+      </form>
     </div>
   </nav>
   {% endif %}
